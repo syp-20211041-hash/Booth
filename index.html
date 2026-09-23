@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>幸運大輪盤 Lucky Draw</title>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --accent-gold: #f59e0b;
+      --accent-pink: #ec4899;
+      --accent-cyan: #06b6d4;
+      --text-light: #f8fafc;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: radial-gradient(circle at center, #1e1b4b 0%, #0f172a 100%);
+      color: var(--text-light);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 20px;
+      overflow-x: hidden;
+    }
+
+    /* Animated background elements */
+    .bg-glow {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(236,72,153,0.15) 0%, rgba(6,182,212,0.15) 50%, rgba(0,0,0,0) 70%);
+      z-index: -1;
+      pointer-events: none;
+      animation: pulse 8s infinite alternate ease-in-out;
+    }
+
+    @keyframes pulse {
+      0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.5; }
+      100% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 25px;
+    }
+
+    h1 {
+      font-size: 2.8rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #fce7f3 0%, #f59e0b 50%, #ec4899 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 10px 20px rgba(0,0,0,0.3);
+      letter-spacing: 2px;
+    }
+
+    p.subtitle {
+      color: #94a3b8;
+      font-size: 1.1rem;
+      margin-top: 5px;
+    }
+
+    .main-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 30px;
+      justify-content: center;
+      align-items: flex-start;
+      max-width: 1200px;
+      width: 100%;
+    }
+
+    /* Wheel Section */
+    .wheel-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+
+    .wheel-wrapper {
+      position: relative;
+      width: 380px;
+      height: 380px;
+      border-radius: 50%;
+      box-shadow: 0 0 30px rgba(245, 158, 11, 0.3),
+                  inset 0 0 15px rgba(255, 255, 255, 0.2);
+      padding: 10px;
+      background: linear-gradient(135deg, #f59e0b, #ec4899, #3b82f6);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    @media (min-width: 480px) {
+      .wheel-wrapper {
+        width: 440px;
+        height: 440px;
+      }
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background-color: #1e293b;
+      box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+    }
+
+    /* Pointer/Stopper Indicator */
+    .pointer {
+      position: absolute;
+      top: -15px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 36px;
+      height: 46px;
+      z-index: 10;
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
+    }
+
+    .pointer-arrow {
+      width: 0;
+      height: 0;
+      border-left: 18px solid transparent;
+      border-right: 18px solid transparent;
+      border-top: 36px solid #ef4444;
+      position: relative;
+    }
+
+    .pointer-arrow::after {
+      content: '';
+      position: absolute;
+      top: -36px;
+      left: -10px;
+      width: 0;
+      height: 0;
+      border-left: 10px solid transparent;
+      border-right: 10px solid transparent;
+      border-top: 20px solid #fca5a5;
+    }
+
+    /* Center Spin Button */
+    .spin-btn {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #fff;
+      border: 4px solid #fff;
+      font-size: 1.2rem;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.6),
+                  inset 0 2px 5px rgba(255, 255, 255, 0.6);
+      z-index: 5;
+      transition: all 0.2s ease;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      user-select: none;
+    }
+
+    .spin-btn:hover:not(:disabled) {
+      transform: translate(-50%, -50%) scale(1.08);
+      box-shadow: 0 0 25px rgba(245, 158, 11, 0.8);
+    }
+
+    .spin-btn:active:not(:disabled) {
+      transform: translate(-50%, -50%) scale(0.95);
+    }
+
+    .spin-btn:disabled {
+      background: #64748b;
+      border-color: #94a3b8;
+      cursor: not-allowed;
+    }
+
+    /* Control & History Panels */
+    .side-panel {
+      flex: 1;
+      min-width: 300px;
+      max-width: 450px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+
+    .card h2 {
+      font-size: 1.2rem;
+      color: var(--accent-cyan);
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Items Manager Form */
+    .input-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #fff;
+      outline: none;
+      transition: border-color 0.3s;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent-pink);
+    }
+
+    .btn {
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-add {
+      background: var(--accent-pink);
+      color: white;
+    }
+
+    .btn-add:hover {
+      background: #db2777;
+    }
+
+    .items-list {
+      max-height: 180px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-right: 5px;
+    }
+
+    /* Custom Scrollbar */
+    .items-list::-webkit-scrollbar, .history-list::-webkit-scrollbar {
+      width: 6px;
+    }
+    .items-list::-webkit-scrollbar-thumb, .history-list::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+    }
+
+    .item-tag {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 8px 12px;
+      border-radius: 8px;
+      border-left: 4px solid var(--accent-gold);
+    }
+
+    .item-tag .delete-btn {
+      color: #ef4444;
+      cursor: pointer;
+      background: none;
+      border: none;
+      font-size: 0.9rem;
+      opacity: 0.7;
+      transition: opacity 0.2s;
+    }
+
+    .item-tag .delete-btn:hover {
+      opacity: 1;
+    }
+
+    /* Options Controls */
+    .options-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 0.9rem;
+    }
+
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #475569;
+      transition: .4s;
+      border-radius: 24px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--accent-pink);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+
+    /* History List */
+    .history-list {
+      max-height: 150px;
+      overflow-y: auto;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .history-item {
+      font-size: 0.9rem;
+      padding: 8px 12px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 6px;
+      display: flex;
+      justify-content: space-between;
+      color: #cbd5e1;
+    }
+
+    .history-item .time {
+      font-size: 0.75rem;
+      color: #64748b;
+    }
+
+    /* Result Modal Glow */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(5px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-card {
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      border: 2px solid var(--accent-gold);
+      border-radius: 20px;
+      padding: 30px;
+      text-align: center;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 0 50px rgba(245, 158, 11, 0.4);
+      transform: scale(0.8);
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .modal-overlay.active .modal-card {
+      transform: scale(1);
+    }
+
+    .modal-card h3 {
+      color: #94a3b8;
+      font-size: 1.1rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .modal-card .result-text {
+      font-size: 2.2rem;
+      font-weight: 800;
+      margin: 20px 0;
+      background: linear-gradient(45deg, #f59e0b, #ec4899);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      line-height: 1.3;
+    }
+
+    .btn-close {
+      background: linear-gradient(135deg, #06b6d4, #3b82f6);
+      color: white;
+      padding: 10px 25px;
+      font-size: 1rem;
+      border-radius: 20px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg-glow"></div>
+
+  <header>
+    <h1>幸運大轉盤</h1>
+    <p class="subtitle">轉出今日專屬舒壓體驗！</p>
+  </header>
+
+  <div class="main-container">
+    <!-- Wheel Container -->
+    <div class="wheel-section">
+      <div class="wheel-wrapper">
+        <div class="pointer">
+          <div class="pointer-arrow"></div>
+        </div>
+        <canvas id="wheelCanvas" width="500" height="500"></canvas>
+        <button id="spinBtn" class="spin-btn">抽獎</button>
+      </div>
+    </div>
+
+    <!-- Controls & History -->
+    <div class="side-panel">
+      <!-- Items Manager -->
+      <div class="card">
+        <h2><i class="fa-solid fa-list-check"></i> 獎項設定</h2>
+        <div class="input-group">
+          <input type="text" id="itemInput" placeholder="新增獎項名稱...">
+          <button id="addBtn" class="btn btn-add"><i class="fa-solid fa-plus"></i> 新增</button>
+        </div>
+        <div class="items-list" id="itemsContainer"></div>
+
+        <div class="options-row">
+          <span><i class="fa-solid fa-volume-high"></i> 音效</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="soundToggle" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- History Log -->
+      <div class="card">
+        <h2><i class="fa-solid fa-clock-rotate-left"></i> 抽獎紀錄</h2>
+        <ul class="history-list" id="historyContainer">
+          <li style="color: #64748b; font-size: 0.85rem; text-align: center; padding: 10px;">尚無紀錄</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Winner Modal -->
+  <div class="modal-overlay" id="resultModal">
+    <div class="modal-card">
+      <i class="fa-solid fa-crown" style="font-size: 3rem; color: #f59e0b; margin-bottom: 10px;"></i>
+      <h3>恭喜獲得</h3>
+      <div class="result-text" id="resultText">---</div>
+      <button class="btn btn-close" id="closeModalBtn">領取獎勵</button>
+    </div>
+  </div>
+
+  <script>
+    // Initial Items list featuring requested options
+    let items = [
+      "手動按摩1分鐘",
+      "按摩槍1分鐘",
+      "捶背2分鐘",
+      "肩頸舒緩1分鐘",
+      "再轉一次",
+      "幫對方按摩1分鐘"
+    ];
+
+    // Color Palette for segments
+    const colors = [
+      '#ec4899', '#8b5cf6', '#06b6d4', '#10b981', 
+      '#f59e0b', '#ef4444', '#3b82f6', '#6366f1'
+    ];
+
+    // Canvas setup
+    const canvas = document.getElementById('wheelCanvas');
+    const ctx = canvas.getContext('2d');
+    const center = canvas.width / 2;
+    const radius = center - 15;
+
+    // State Variables
+    let startAngle = 0;
+    let isSpinning = false;
+    let spinTimeout = null;
+    let spinAngleStart = 0;
+    let spinTime = 0;
+    let spinTimeTotal = 0;
+
+    // Audio Context Setup
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new AudioContext();
+      }
+    }
+
+    function playTickSound() {
+      if (!document.getElementById('soundToggle').checked) return;
+      initAudio();
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.04);
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.04);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.05);
+    }
+
+    function playWinSound() {
+      if (!document.getElementById('soundToggle').checked) return;
+      initAudio();
+      const notes = [400, 500, 600, 800];
+      notes.forEach((freq, idx) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.1);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime + idx * 0.1);
+        gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + idx * 0.1 + 0.2);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(audioCtx.currentTime + idx * 0.1);
+        osc.stop(audioCtx.currentTime + idx * 0.1 + 0.25);
+      });
+    }
+
+    // Render Items Manager
+    function renderItemsList() {
+      const container = document.getElementById('itemsContainer');
+      container.innerHTML = '';
+      items.forEach((item, index) => {
+        const tag = document.createElement('div');
+        tag.className = 'item-tag';
+        tag.style.borderLeftColor = colors[index % colors.length];
+        tag.innerHTML = `
+          <span>${item}</span>
+          <button class="delete-btn" onclick="removeItem(${index})"><i class="fa-solid fa-trash"></i></button>
+        `;
+        container.appendChild(tag);
+      });
+      drawWheel();
+    }
+
+    function addItem() {
+      const input = document.getElementById('itemInput');
+      const val = input.value.trim();
+      if (val) {
+        items.push(val);
+        input.value = '';
+        renderItemsList();
+      }
+    }
+
+    function removeItem(index) {
+      if (items.length <= 2) {
+        alert('最少需要保持 2 個獎項項目！');
+        return;
+      }
+      items.splice(index, 1);
+      renderItemsList();
+    }
+
+    // Draw Wheel Canvas
+    function drawWheel() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (items.length === 0) return;
+
+      const arc = (2 * Math.PI) / items.length;
+
+      // Outer glow rim
+      ctx.beginPath();
+      ctx.arc(center, center, radius + 8, 0, 2 * Math.PI);
+      ctx.fillStyle = '#0f172a';
+      ctx.fill();
+
+      // Segments
+      for (let i = 0; i < items.length; i++) {
+        const angle = startAngle + i * arc;
+        ctx.fillStyle = colors[i % colors.length];
+
+        ctx.beginPath();
+        ctx.arc(center, center, radius, angle, angle + arc, false);
+        ctx.arc(center, center, 20, angle + arc, angle, true);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 4;
+        ctx.fillStyle = "#ffffff";
+        ctx.translate(
+          center + Math.cos(angle + arc / 2) * (radius - 70),
+          center + Math.sin(angle + arc / 2) * (radius - 70)
+        );
+        ctx.rotate(angle + arc / 2 + Math.PI / 2);
+        
+        ctx.font = 'bold 16px "Segoe UI", sans-serif';
+        const text = items[i];
+        ctx.fillText(text, -ctx.measureText(text).width / 2, 0);
+        ctx.restore();
+      }
+
+      // Center Decor Ring
+      ctx.beginPath();
+      ctx.arc(center, center, 35, 0, 2 * Math.PI);
+      ctx.fillStyle = '#0f172a';
+      ctx.fill();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#f59e0b';
+      ctx.stroke();
+    }
+
+    // Spin Logic with Realistic Physics
+    let lastSegmentIndex = -1;
+
+    function rotateWheel() {
+      spinTime += 30;
+      if (spinTime >= spinTimeTotal) {
+        stopRotateWheel();
+        return;
+      }
+
+      // Ease Out Quadratic
+      const progress = spinTime / spinTimeTotal;
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      const currentAngle = spinAngleStart * (1 - easeOut);
+      
+      startAngle += (currentAngle * Math.PI / 180);
+      drawWheel();
+
+      // Calculate Tick Sound based on segment passing
+      const degrees = startAngle * 180 / Math.PI;
+      const arcd = 360 / items.length;
+      const currentSegmentIndex = Math.floor((360 - (degrees % 360)) / arcd) % items.length;
+
+      if (currentSegmentIndex !== lastSegmentIndex) {
+        playTickSound();
+        lastSegmentIndex = currentSegmentIndex;
+      }
+
+      spinTimeout = setTimeout(rotateWheel, 30);
+    }
+
+    function stopRotateWheel() {
+      clearTimeout(spinTimeout);
+      isSpinning = false;
+      document.getElementById('spinBtn').disabled = false;
+
+      // Determine Winner Segment
+      const degrees = startAngle * 180 / Math.PI;
+      const arcd = 360 / items.length;
+      // Index relative to top center pointer (-90deg offset)
+      let index = Math.floor((360 - (degrees % 360) + 270) % 360 / arcd);
+      index = (items.length - 1 - Math.floor(((degrees + 90) % 360) / arcd) + items.length) % items.length;
+
+      const winningItem = items[index];
+      
+      // Trigger Celebrations
+      showWinner(winningItem);
+      addHistory(winningItem);
+      playWinSound();
+
+      // Confetti Explosion
+      confetti({
+        particleCount: 120,
+        spread: 80,
+        origin: { y: 0.6 }
+      });
+    }
+
+    function spin() {
+      if (isSpinning) return;
+      initAudio();
+
+      isSpinning = true;
+      document.getElementById('spinBtn').disabled = true;
+
+      spinAngleStart = Math.random() * 10 + 20;
+      spinTime = 0;
+      spinTimeTotal = Math.random() * 3000 + 4000; // 4-7 seconds duration
+
+      rotateWheel();
+    }
+
+    // Modal & History Logic
+    function showWinner(item) {
+      document.getElementById('resultText').innerText = item;
+      document.getElementById('resultModal').classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('resultModal').classList.remove('active');
+    }
+
+    function addHistory(item) {
+      const historyContainer = document.getElementById('historyContainer');
+      
+      if (historyContainer.children[0] && historyContainer.children[0].tagName === 'LI' && historyContainer.children[0].innerText.includes('尚無紀錄')) {
+        historyContainer.innerHTML = '';
+      }
+
+      const li = document.createElement('li');
+      li.className = 'history-item';
+      
+      const now = new Date();
+      const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+
+      li.innerHTML = `
+        <span><i class="fa-solid fa-gift" style="color: #ec4899;"></i> ${item}</span>
+        <span class="time">${timeStr}</span>
+      `;
+      historyContainer.insertBefore(li, historyContainer.firstChild);
+    }
+
+    // Event Listeners
+    document.getElementById('spinBtn').addEventListener('click', spin);
+    document.getElementById('addBtn').addEventListener('click', addItem);
+    document.getElementById('itemInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') addItem();
+    });
+    document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+
+    // Initial load
+    renderItemsList();
+  </script>
+</body>
+</html>
